@@ -83,7 +83,7 @@ void readFile(FATData *fatData, DIR_ENT *dir) {
         free(buffer);
         fat = fatData->fat[fat].value;
     }while(fat <= 0xFFEF&&fat >= 0x0002);
-	print("\n");
+	printf("\n");
 }
 
 void iterateDirectory(FATData *fatData, DIR_ENT *dir, int level) {

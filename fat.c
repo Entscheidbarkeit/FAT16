@@ -78,12 +78,12 @@ void readFile(FATData *fatData, DIR_ENT *dir) {
         char* buffer = malloc(fatData->entry_size+1);
         fs_read(fatData->fd,fatData->data_offset+(fat-2)*fatData->entry_size,(void*)buffer,fatData->entry_size);
         buffer[fatData->entry_size] = '\0';
-        printf("%s\n",buffer);
+        printf("%s",buffer);
         fflush(stdout);
         free(buffer);
         fat = fatData->fat[fat].value;
     }while(fat <= 0xFFEF&&fat >= 0x0002);
-
+	print("\n");
 }
 
 void iterateDirectory(FATData *fatData, DIR_ENT *dir, int level) {
@@ -224,8 +224,12 @@ int main(int argc, char *argv[]) {
     char command = ' ';
 
     struct boot_sector * boot = malloc(sizeof(struct boot_sector));
+    if(boot == NULL)
+    	die("");
     fs_read(fd,0,(void*)boot,512);
     FATData* fat = malloc(sizeof(FATData));
+    if(fat == NULL)
+    	die("");
     initFatData(fd,boot,fat);
     do {
         print_menu();

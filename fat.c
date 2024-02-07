@@ -75,7 +75,7 @@ void readFile(FATData *fatData, DIR_ENT *dir) {
     uint16_t fat = dir->start;
     do{
         char* buffer = malloc(fatData->entry_size+1);
-        fs_read(fatData->fd,fatData->data_offset+fat*fatData->entry_size,(void*)buffer,fatData->entry_size);
+        fs_read(fatData->fd,fatData->data_offset+(fat-2)*fatData->entry_size,(void*)buffer,fatData->entry_size);
         buffer[fatData->entry_size] = '\0';
         printf("%s\n",buffer);
         fflush(stdout);
@@ -133,19 +133,33 @@ void handleEntry(FATData *fatData, DIR_ENT *dir, int level){
 }
 
 void search_print_dir(FATData *fatData, DIR_ENT *dir,const char* name);
+int stringCmp(char* a, const char* b){
+	char aa = a[0];
+	int index = 0;
+	while(aa != '\0'){
+		if(a[index] != b[index]){
+			return 1;
+		}
+		index++;
+		aa = a[index];
+	}
+	return 0;
+}
 void search_handleEntry(FATData *fatData, DIR_ENT *dir,const char* name){
     
     if(CHECKFLAGS(dir->attr, ATTR_VOLUME)){
         return;
     }
-    if(dir->name[0] == '\0'||dir->name[0] =='.'){
+    if(dir->name[0] == '\0'){
         return; 
     }
     if (CHECKFLAGS(dir->attr, ATTR_DIR)){
-        search_print_dir(fatData,dir,name);
+    	if(dir->name[0] !='.')
+        	search_print_dir(fatData,dir,name);
     }
     else{
-        if(strcmp(sanitizeName((char*)dir->name),name) == 0){
+    	char* thisName = sanitizeName((char*)dir->name);
+        if(stringCmp(thisName,name) == 0){
             readFile(fatData,dir);
         }
     }
@@ -160,13 +174,14 @@ void search_print_root(FATData *fatData, const char* name){
     }
 }
 
+
 void search_print_dir(FATData *fatData, DIR_ENT *dir,const char* name){
     if (!CHECKFLAGS(dir->attr, ATTR_DIR)) return;
     uint16_t fat = dir->start;
     do{
         DIR_ENT *cur = malloc(sizeof(DIR_ENT));
         for(uint32_t i = 0; i < fatData->entry_size/sizeof(DIR_ENT);i++){
-            fs_read(fatData->fd,fatData->entry_size*fat+i*sizeof(DIR_ENT),(void*)cur,sizeof(DIR_ENT));
+            fs_read(fatData->fd,fatData->data_offset+fatData->entry_size*(fat-2)+i*sizeof(DIR_ENT),(void*)cur,sizeof(DIR_ENT));
             search_handleEntry(fatData,cur,name);
         }
         free(cur);
@@ -231,9 +246,9 @@ int main(int argc, char *argv[]) {
                 		break;
                 	}
                 }
-                char* real_name = sanitizeName(name);
+             
                 
-                search_print_root(fat,real_name);
+                search_print_root(fat,name);
                 free(name);
                 printf("\n");
                 break;

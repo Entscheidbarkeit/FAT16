@@ -213,9 +213,11 @@ int main(int argc, char *argv[]) {
         switch (command) {
             case 'l': 
                 printLabel(fd);
+                printf("\n");
                 break;
             case 'i': 
                 iterateRoot(fat);
+                printf("\n");
                 break;
             case 'f': {
                 char* name = malloc(12);
@@ -230,6 +232,7 @@ int main(int argc, char *argv[]) {
                 
                 search_print_root(fat,real_name);
                 free(name);
+                printf("\n");
                 break;
             }
             case 'q': 

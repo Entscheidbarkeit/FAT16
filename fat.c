@@ -136,6 +136,7 @@ void handleEntry(FATData *fatData, DIR_ENT *dir, int level){
 void search_print_dir(FATData *fatData, DIR_ENT *dir,const char* name);
 int stringCmp(char* a, const char* b){
 	char aa = a[0];
+	char bb = b[0];
 	int index = 0;
 	while(aa != '\0'){
 		if(a[index] != b[index]){
@@ -143,7 +144,10 @@ int stringCmp(char* a, const char* b){
 		}
 		index++;
 		aa = a[index];
+		bb = b[index];
 	}
+	if(aa != bb)
+		return 1;
 	return 0;
 }
 void search_handleEntry(FATData *fatData, DIR_ENT *dir,const char* name){

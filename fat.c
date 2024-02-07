@@ -248,6 +248,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'f': {
                 char* name = malloc(12);
+                if(name == NULL){
+                	die("");
+                }
                 fgetc(stdin);
                 for(int i = 0; i< 12; i++){
                 	name[i] = (char)fgetc(stdin);

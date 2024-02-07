@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <math.h>
 
 #include "fat_structures.h"
 
@@ -46,7 +47,7 @@ FAT_ENTRY *readFAT(int fd, struct boot_sector *boot) {
         *s_size = GET_UNALIGNED_W(boot->sector_size);
     }
     FAT_ENTRY* fat = malloc(boot->fat_length * (*s_size));
-    fs_read(fd,(boot->reserved+1)*(*s_size),(void*)fat,boot->fat_length*(*s_size));
+    fs_read(fd,(boot->reserved)*(*s_size),(void*)fat,boot->fat_length*(*s_size));
     return fat;
 }
 
@@ -61,8 +62,8 @@ void initFatData(int fd, struct boot_sector *boot, FATData *fatData) {
         fatData->root_entries = GET_UNALIGNED_W(boot->dir_entries);
     }
     fatData->entry_size = boot->cluster_size*fatData->sector_size;
-    fatData->rootdir_offset = (boot->reserved + boot->fat_length + 1)*fatData->sector_size;
-    fatData->data_offset = fatData->rootdir_offset + (fatData->root_entries*32)/fatData->sector_size;
+    fatData->rootdir_offset = (boot->reserved + boot->fat_length*boot->fats)*fatData->sector_size;
+    fatData->data_offset = fatData->rootdir_offset + ceil(fatData->root_entries*32/fatData->sector_size)*fatData->sector_size;
 }
 
 void readFile(FATData *fatData, DIR_ENT *dir) {
@@ -71,10 +72,10 @@ void readFile(FATData *fatData, DIR_ENT *dir) {
     // Artemis expects this line
     puts("Reading file:");
 
-    uint16_t fat = dir->starthi;
+    uint16_t fat = dir->start;
     do{
         char* buffer = malloc(fatData->entry_size+1);
-        fs_read(fatData->fd,fat*fatData->entry_size,(void*)buffer,fatData->entry_size);
+        fs_read(fatData->fd,fatData->data_offset+fat*fatData->entry_size,(void*)buffer,fatData->entry_size);
         buffer[fatData->entry_size] = '\0';
         printf("%s\n",buffer);
         fflush(stdout);
@@ -90,7 +91,7 @@ void iterateDirectory(FATData *fatData, DIR_ENT *dir, int level) {
     do{
         DIR_ENT *cur = malloc(sizeof(DIR_ENT));
         for(uint32_t i = 0; i < fatData->entry_size/sizeof(DIR_ENT);i++){
-            fs_read(fatData->fd,fatData->entry_size*fat+i*sizeof(DIR_ENT),(void*)cur,sizeof(DIR_ENT));
+            fs_read(fatData->fd,fatData->data_offset+fatData->entry_size*(fat-2)+i*sizeof(DIR_ENT),(void*)cur,sizeof(DIR_ENT));
             handleEntry(fatData,cur,level);
         }
         free(cur);
@@ -120,9 +121,10 @@ void handleEntry(FATData *fatData, DIR_ENT *dir, int level){
         printf("\t");
     }
     if (CHECKFLAGS(dir->attr, ATTR_DIR)){
-        printf("Dir: \"%s\"\n",sanitizeName((char*)dir->name));
+        printf("Dir : \"%s\"\n",sanitizeName((char*)dir->name));
         fflush(stdout);
-        iterateDirectory(fatData,dir,level+1);
+        if(dir->name[0] != '.')
+        	iterateDirectory(fatData,dir,level+1);
     }
     else{
         printf("File: \"%s\"\n",sanitizeName((char*)dir->name));
@@ -136,7 +138,7 @@ void search_handleEntry(FATData *fatData, DIR_ENT *dir,const char* name){
     if(CHECKFLAGS(dir->attr, ATTR_VOLUME)){
         return;
     }
-    if(dir->name[0] == '\0'){
+    if(dir->name[0] == '\0'||dir->name[0] =='.'){
         return; 
     }
     if (CHECKFLAGS(dir->attr, ATTR_DIR)){

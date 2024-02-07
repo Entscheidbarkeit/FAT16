@@ -60,7 +60,7 @@ void initFatData(int fd, struct boot_sector *boot, FATData *fatData) {
         fatData->sector_size = GET_UNALIGNED_W(boot->sector_size);
         fatData->root_entries = GET_UNALIGNED_W(boot->dir_entries);
     }
-    fatData->entry_size = boot->cluster_size;
+    fatData->entry_size = boot->cluster_size*fatData->sector_size;
     fatData->rootdir_offset = (boot->reserved + boot->fat_length + 1)*fatData->sector_size;
     fatData->data_offset = fatData->rootdir_offset + (fatData->root_entries*32)/fatData->sector_size;
 }
@@ -86,7 +86,7 @@ void readFile(FATData *fatData, DIR_ENT *dir) {
 
 void iterateDirectory(FATData *fatData, DIR_ENT *dir, int level) {
     if (!CHECKFLAGS(dir->attr, ATTR_DIR)) return;
-    uint16_t fat = dir->starthi;
+    uint16_t fat = dir->start;
     do{
         DIR_ENT *cur = malloc(sizeof(DIR_ENT));
         for(uint32_t i = 0; i < fatData->entry_size/sizeof(DIR_ENT);i++){
@@ -109,14 +109,15 @@ void iterateRoot(FATData *fatData) {
 }
 
 void handleEntry(FATData *fatData, DIR_ENT *dir, int level){
-    for(int i = 0; i< level; i++){
-        printf("\t");
-    }
+
     if(CHECKFLAGS(dir->attr, ATTR_VOLUME)){
         return;
     }
     if(dir->name[0] == '\0'){
         return; 
+    }
+    for(int i = 0; i< level; i++){
+        printf("\t");
     }
     if (CHECKFLAGS(dir->attr, ATTR_DIR)){
         printf("Dir: \"%s\"\n",sanitizeName((char*)dir->name));
@@ -159,7 +160,7 @@ void search_print_root(FATData *fatData, const char* name){
 
 void search_print_dir(FATData *fatData, DIR_ENT *dir,const char* name){
     if (!CHECKFLAGS(dir->attr, ATTR_DIR)) return;
-    uint16_t fat = dir->starthi;
+    uint16_t fat = dir->start;
     do{
         DIR_ENT *cur = malloc(sizeof(DIR_ENT));
         for(uint32_t i = 0; i < fatData->entry_size/sizeof(DIR_ENT);i++){

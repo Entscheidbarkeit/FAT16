@@ -70,6 +70,7 @@ void readFile(FATData *fatData, DIR_ENT *dir) {
     if (CHECKFLAGS(dir->attr, ATTR_DIR)) return;
     
     // Artemis expects this line
+    printf("File: \"%s\"\n",sanitizeName((char*)dir->name));
     puts("Reading file:");
 
     uint16_t fat = dir->start;
@@ -239,6 +240,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'f': {
                 char* name = malloc(12);
+                fgetc(stdin);
                 for(int i = 0; i< 12; i++){
                 	name[i] = (char)fgetc(stdin);
                 	if(name[i] == '\n'){
@@ -247,7 +249,6 @@ int main(int argc, char *argv[]) {
                 	}
                 }
              
-                printf("File: \"%s\"",name);
                 search_print_root(fat,name);
                 free(name);
                 printf("\n");

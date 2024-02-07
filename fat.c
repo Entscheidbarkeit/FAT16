@@ -247,7 +247,7 @@ int main(int argc, char *argv[]) {
                 	}
                 }
              
-                
+                printf("File: \"%s\"",name);
                 search_print_root(fat,name);
                 free(name);
                 printf("\n");
@@ -255,6 +255,9 @@ int main(int argc, char *argv[]) {
             }
             case 'q': 
                 die("");
+                free(boot);
+                free(fat->fat);
+                free(fat);
                 break;
             default: break;
         }

@@ -33,7 +33,7 @@ void printLabel(int fd) {
     // Artemis expects this exact format
     char *format_string = "The Label of the given FAT16 file system is: \"%.11s\"\n";
     char* buffer = malloc(12);
-    fs_read(fd,0,(void*)buffer,43);
+    fs_read(fd,43,(void*)buffer,11);
     buffer[11] = '\0';
     printf(format_string,buffer);
     free(buffer);
@@ -45,7 +45,7 @@ FAT_ENTRY *readFAT(int fd, struct boot_sector *boot) {
     if(endianess()){
         *s_size = GET_UNALIGNED_W(boot->sector_size);
     }
-    FAT_ENTRY* fat = malloc(boot->fat_length * (*s_size)/2);
+    FAT_ENTRY* fat = malloc(boot->fat_length * (*s_size));
     fs_read(fd,(boot->reserved+1)*(*s_size),(void*)fat,boot->fat_length*(*s_size));
     return fat;
 }
@@ -75,8 +75,8 @@ void readFile(FATData *fatData, DIR_ENT *dir) {
     do{
         char* buffer = malloc(fatData->entry_size+1);
         fs_read(fatData->fd,fat*fatData->entry_size,(void*)buffer,fatData->entry_size);
-        buffer[fatData->entry_size+1] = '\0';
-        printf("%s",buffer);
+        buffer[fatData->entry_size] = '\0';
+        printf("%s\n",buffer);
         fflush(stdout);
         free(buffer);
         fat = fatData->fat[fat].value;
@@ -87,21 +87,13 @@ void readFile(FATData *fatData, DIR_ENT *dir) {
 void iterateDirectory(FATData *fatData, DIR_ENT *dir, int level) {
     if (!CHECKFLAGS(dir->attr, ATTR_DIR)) return;
     uint16_t fat = dir->starthi;
-    int cluster_ended = 0;
     do{
         DIR_ENT *cur = malloc(sizeof(DIR_ENT));
         for(uint32_t i = 0; i < fatData->entry_size/sizeof(DIR_ENT);i++){
             fs_read(fatData->fd,fatData->entry_size*fat+i*sizeof(DIR_ENT),(void*)cur,sizeof(DIR_ENT));
-            if(cur->size == 0){
-                cluster_ended = 1;
-                break;
-            }
             handleEntry(fatData,cur,level);
         }
         free(cur);
-        if(cluster_ended){
-            break;
-        }
         fat = fatData->fat[fat].value;
     }while(fat <= 0xFFEF&&fat >= 0x0002);
 }
@@ -110,9 +102,7 @@ void iterateRoot(FATData *fatData) {
     for(uint16_t i = 0; i< fatData->root_entries; i++){
         DIR_ENT *cur = malloc(sizeof(DIR_ENT));
         fs_read(fatData->fd,fatData->rootdir_offset+i*sizeof(DIR_ENT),(void*)cur,sizeof(DIR_ENT));
-        if(cur->size == 0){
-            break;
-        }
+    
         handleEntry(fatData,cur,0);
         free(cur);
     }
@@ -152,7 +142,7 @@ void search_handleEntry(FATData *fatData, DIR_ENT *dir,const char* name){
         search_print_dir(fatData,dir,name);
     }
     else{
-        if(strcmp((char*)dir->name,name) == 0){
+        if(strcmp(sanitizeName((char*)dir->name),name) == 0){
             readFile(fatData,dir);
         }
     }
@@ -162,9 +152,6 @@ void search_print_root(FATData *fatData, const char* name){
     for(uint16_t i = 0; i< fatData->root_entries; i++){
         DIR_ENT *cur = malloc(sizeof(DIR_ENT));
         fs_read(fatData->fd,fatData->rootdir_offset+i*sizeof(DIR_ENT),(void*)cur,sizeof(DIR_ENT));
-        if(cur->size == 0){
-            break;
-        }
         search_handleEntry(fatData,cur,name);
         free(cur);
     }
@@ -173,21 +160,13 @@ void search_print_root(FATData *fatData, const char* name){
 void search_print_dir(FATData *fatData, DIR_ENT *dir,const char* name){
     if (!CHECKFLAGS(dir->attr, ATTR_DIR)) return;
     uint16_t fat = dir->starthi;
-    int cluster_ended = 0;
     do{
         DIR_ENT *cur = malloc(sizeof(DIR_ENT));
         for(uint32_t i = 0; i < fatData->entry_size/sizeof(DIR_ENT);i++){
             fs_read(fatData->fd,fatData->entry_size*fat+i*sizeof(DIR_ENT),(void*)cur,sizeof(DIR_ENT));
-            if(cur->size == 0){
-                cluster_ended = 1;
-                break;
-            }
             search_handleEntry(fatData,cur,name);
         }
         free(cur);
-        if(cluster_ended){
-            break;
-        }
         fat = fatData->fat[fat].value;
     }while(fat <= 0xFFEF&&fat >= 0x0002);
 }
@@ -239,12 +218,18 @@ int main(int argc, char *argv[]) {
                 iterateRoot(fat);
                 break;
             case 'f': {
-                char* name = malloc(11);
-                read(0,name,11);
+                char* name = malloc(12);
+                for(int i = 0; i< 12; i++){
+                	name[i] = (char)fgetc(stdin);
+                	if(name[i] == '\n'){
+                		name[i] = '\0';
+                		break;
+                	}
+                }
                 char* real_name = sanitizeName(name);
-                free(name);
+                
                 search_print_root(fat,real_name);
-                free(real_name);
+                free(name);
                 break;
             }
             case 'q': 
